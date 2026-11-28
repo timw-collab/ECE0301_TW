@@ -199,22 +199,122 @@ TEST_CASE("Network: Test overriding and dynamic binding", "[network]")
 
 // Uncomment these partial test cases when you are ready to test the dividers.
 
-// TEST_CASE("Network: Test VoltageDivider", "[network]")
-// {
-//   double voltage = 5.0;
-//   const int num = 2;
-//   double res[num] = {200, 400};
-//   VoltageDivider div(voltage, res, num);
+TEST_CASE("Network: Test VoltageDivider", "[network]")
+{
+  double voltage = 5.0;
+  const int num = 2;
+  double res[num] = {200, 400};
+  VoltageDivider div(voltage, res, num);
 
-//   // TODO
-// }
+  // TODO
+}
 
-// TEST_CASE("Network: Test CurrentDivider", "[network]")
-// {
-//   double current = 0.006;
-//   const int num = 2;
-//   double res[num] = {15000, 75000};
-//   CurrentDivider div(current, res, num);
+TEST_CASE("Network: Test CurrentDivider", "[network]")
+{
+  double current = 0.006;
+  const int num = 2;
+  double res[num] = {15000, 75000};
+  CurrentDivider div(current, res, num);
 
-//   // TODO
-// }
+  // TODO
+}
+
+//Section 4: CurrentDivider
+TEST_CASE("Network: Test CurrentDivider", "[network]")
+{
+  double current = 0.006;
+  const int num = 2;
+  double res[num] = {15000, 75000};
+  CurrentDivider div(current, res, num);
+
+  // structure: always 2 nodes, num + 1 components
+  REQUIRE(div.get_num_resistors() == 2);
+  REQUIRE(div.get_num_nodes() == 2);
+  REQUIRE(div.get_num_components() == 3);
+
+  // values after construction
+  REQUIRE(compare_double(div.get_source_current(), 0.006));
+  REQUIRE(compare_double(div.get_resistance(0), 15000));
+  REQUIRE(compare_double(div.get_resistance(1), 75000));
+
+  // R_eq = 12500, V = 0.006 * 12500 = 75
+  REQUIRE(compare_double(div.get_resistor_voltage(), 75));
+  REQUIRE(compare_double(div.get_node_voltage(0), 0));
+  REQUIRE(compare_double(div.get_node_voltage(1), 75));
+  REQUIRE(compare_double(div.get_resistor_current(0), 0.005));
+  REQUIRE(compare_double(div.get_resistor_current(1), 0.001));
+
+  // KCL: resistor currents add up to the source current
+  REQUIRE(compare_double(div.get_resistor_current(0) + div.get_resistor_current(1), div.get_source_current()));
+
+  // set_source_current: V = 0.012 * 12500 = 150
+  div.set_source_current(0.012);
+  REQUIRE(compare_double(div.get_source_current(), 0.012));
+  REQUIRE(compare_double(div.get_resistor_voltage(), 150));
+  REQUIRE(compare_double(div.get_resistor_current(0), 0.01));
+  REQUIRE(compare_double(div.get_resistor_current(1), 0.002));
+
+  // set_resistance: both 15000, R_eq = 7500, V = 90
+  div.set_resistance(1, 15000);
+  REQUIRE(compare_double(div.get_resistance(1), 15000));
+  REQUIRE(compare_double(div.get_resistor_voltage(), 90));
+  REQUIRE(compare_double(div.get_resistor_current(0), 0.006));
+  REQUIRE(compare_double(div.get_resistor_current(1), 0.006));
+
+  // index exceptions
+  REQUIRE_THROWS_AS(div.get_resistance(-1), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistance(2), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistor_current(-1), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistor_current(2), std::out_of_range);
+  REQUIRE_THROWS_AS(div.set_resistance(-1, 100), std::out_of_range);
+  REQUIRE_THROWS_AS(div.set_resistance(2, 100), std::out_of_range);
+
+  // negative resistance
+  REQUIRE_THROWS_AS(div.set_resistance(0, -100), std::invalid_argument);
+
+  // constructor exceptions
+  REQUIRE_THROWS_AS(CurrentDivider(current, res, 0), std::invalid_argument);
+  REQUIRE_THROWS_AS(CurrentDivider(current, res, -1), std::invalid_argument);
+  double bad_res[num] = {-15000, 75000};
+  REQUIRE_THROWS_AS(CurrentDivider(current, bad_res, num), std::invalid_argument);
+}
+
+TEST_CASE("Network: Test CurrentDivider with three resistors", "[network]")
+{
+  const int num = 3;
+  double res[num] = {100, 200, 200};
+  CurrentDivider div(0.1, res, num);
+
+  // G = 0.01 + 0.005 + 0.005 = 0.02, V = 0.1 / 0.02 = 5
+  REQUIRE(compare_double(div.get_resistor_voltage(), 5));
+  REQUIRE(compare_double(div.get_resistor_current(0), 0.05));
+  REQUIRE(compare_double(div.get_resistor_current(1), 0.025));
+  REQUIRE(compare_double(div.get_resistor_current(2), 0.025));
+
+  // every resistor has the same voltage in parallel
+  REQUIRE(compare_double(div.get_component_voltage(1), div.get_component_voltage(3)));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
