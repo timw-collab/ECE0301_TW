@@ -1,4 +1,5 @@
 #include "Resistor.hpp"
+#include <stdexcept>
 
 void Resistor::set_value(double r)
 {
