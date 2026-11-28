@@ -219,6 +219,95 @@ TEST_CASE("Network: Test CurrentDivider", "[network]")
   // TODO
 }
 
+//Section 3: VoltageDivider
+TEST_CASE("Network: Test VoltageDivider", "[network]")
+{
+  double voltage = 5.0;
+  const int num = 2;
+  double res[num] = {200, 400};
+  VoltageDivider div(voltage, res, num);
+
+  // structure: num + 1 nodes, num + 1 components
+  REQUIRE(div.get_num_resistors() == 2);
+  REQUIRE(div.get_num_nodes() == 3);
+  REQUIRE(div.get_num_components() == 3);
+
+  // values after construction
+  REQUIRE(compare_double(div.get_source_voltage(), 5.0));
+  REQUIRE(compare_double(div.get_resistance(0), 200));
+  REQUIRE(compare_double(div.get_resistance(1), 400));
+
+  // I = 5 / 600, V0 = I * 200, V1 = I * 400
+  REQUIRE(compare_double(div.get_loop_current(), 5.0 / 600));
+  REQUIRE(compare_double(div.get_resistor_voltage(0), 5.0 / 3));
+  REQUIRE(compare_double(div.get_resistor_voltage(1), 10.0 / 3));
+
+  // node voltages
+  REQUIRE(compare_double(div.get_node_voltage(0), 0));
+  REQUIRE(compare_double(div.get_node_voltage(1), 5.0));
+  REQUIRE(compare_double(div.get_node_voltage(2), 10.0 / 3));
+
+  // same current through every resistor
+  REQUIRE(compare_double(div.get_component_current(1), div.get_component_current(2)));
+
+  // set_source_voltage: I = 12 / 600 = 0.02
+  div.set_source_voltage(12);
+  REQUIRE(compare_double(div.get_source_voltage(), 12));
+  REQUIRE(compare_double(div.get_loop_current(), 0.02));
+  REQUIRE(compare_double(div.get_resistor_voltage(0), 4));
+  REQUIRE(compare_double(div.get_resistor_voltage(1), 8));
+  REQUIRE(compare_double(div.get_node_voltage(2), 8));
+
+  // set_resistance: R1 = 200, I = 12 / 400 = 0.03
+  div.set_resistance(1, 200);
+  REQUIRE(compare_double(div.get_resistance(1), 200));
+  REQUIRE(compare_double(div.get_loop_current(), 0.03));
+  REQUIRE(compare_double(div.get_resistor_voltage(0), 6));
+  REQUIRE(compare_double(div.get_resistor_voltage(1), 6));
+  REQUIRE(compare_double(div.get_node_voltage(2), 6));
+
+  // index exceptions
+  REQUIRE_THROWS_AS(div.get_resistance(-1), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistance(2), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistor_voltage(-1), std::out_of_range);
+  REQUIRE_THROWS_AS(div.get_resistor_voltage(2), std::out_of_range);
+  REQUIRE_THROWS_AS(div.set_resistance(-1, 100), std::out_of_range);
+  REQUIRE_THROWS_AS(div.set_resistance(2, 100), std::out_of_range);
+
+  // negative resistance
+  REQUIRE_THROWS_AS(div.set_resistance(0, -100), std::invalid_argument);
+
+  // constructor exceptions
+  REQUIRE_THROWS_AS(VoltageDivider(voltage, res, 0), std::invalid_argument);
+  REQUIRE_THROWS_AS(VoltageDivider(voltage, res, -1), std::invalid_argument);
+  double bad_res[num] = {200, -400};
+  REQUIRE_THROWS_AS(VoltageDivider(voltage, bad_res, num), std::invalid_argument);
+}
+
+TEST_CASE("Network: Test VoltageDivider with three resistors", "[network]")
+{
+  const int num = 3;
+  double res[num] = {100, 200, 300};
+  VoltageDivider div(9, res, num);
+
+  // I = 9 / 600 = 0.015, drops 1.5, 3, 4.5
+  REQUIRE(div.get_num_nodes() == 4);
+  REQUIRE(compare_double(div.get_loop_current(), 0.015));
+  REQUIRE(compare_double(div.get_resistor_voltage(0), 1.5));
+  REQUIRE(compare_double(div.get_resistor_voltage(1), 3));
+  REQUIRE(compare_double(div.get_resistor_voltage(2), 4.5));
+  REQUIRE(compare_double(div.get_node_voltage(1), 9));
+  REQUIRE(compare_double(div.get_node_voltage(2), 7.5));
+  REQUIRE(compare_double(div.get_node_voltage(3), 4.5));
+
+  // a single resistor gets the full source voltage
+  double one_res[1] = {1000};
+  VoltageDivider div1(3.3, one_res, 1);
+  REQUIRE(div1.get_num_nodes() == 2);
+  REQUIRE(compare_double(div1.get_resistor_voltage(0), 3.3));
+  REQUIRE(compare_double(div1.get_loop_current(), 0.0033));
+}
+
 //Section 4: CurrentDivider
 TEST_CASE("Network: Test CurrentDivider", "[network]")
 {
@@ -295,26 +384,73 @@ TEST_CASE("Network: Test CurrentDivider with three resistors", "[network]")
   REQUIRE(compare_double(div.get_component_voltage(1), div.get_component_voltage(3)));
 }
 
+//Section 5: PracticalVsCircuit 
+TEST_CASE("Network: Test PracticalVsCircuit", "[network]")
+{
+  // VS = 10, RS = 50, RL = 150: I = 0.05, VL = 7.5
+  PracticalVsCircuit pvs(10, 50, 150);
+  REQUIRE(pvs.get_num_resistors() == 2);
+  REQUIRE(compare_double(pvs.get_resistance(0), 50));
+  REQUIRE(compare_double(pvs.get_resistance(1), 150));
+  REQUIRE(compare_double(pvs.get_source_voltage(), 7.5));
+  REQUIRE(compare_double(pvs.VoltageDivider::get_source_voltage(), 10));
+  REQUIRE(compare_double(pvs.get_load_power(), 0.375));
 
+  // set_load: RL = 450, I = 0.02, VL = 9, PL = 0.18
+  pvs.set_load(450);
+  REQUIRE(compare_double(pvs.get_resistance(1), 450));
+  REQUIRE(compare_double(pvs.get_source_voltage(), 9));
+  REQUIRE(compare_double(pvs.get_load_power(), 0.18));
 
+  // matched load: RL = RS gives Pmax = 100 / 200 = 0.5
+  REQUIRE(pvs.maximum_power_transfer(50));
+  REQUIRE(compare_double(pvs.get_resistance(1), 50));
+  REQUIRE(compare_double(pvs.get_source_voltage(), 5));
+  REQUIRE(compare_double(pvs.get_load_power(), 0.5));
 
+  // unmatched load: still changes the circuit, VL = 10 * 100 / 150
+  REQUIRE_FALSE(pvs.maximum_power_transfer(100));
+  REQUIRE(compare_double(pvs.get_resistance(1), 100));
+  REQUIRE(compare_double(pvs.get_source_voltage(), 20.0 / 3));
+  REQUIRE(pvs.get_load_power() < 0.5);
+  REQUIRE_FALSE(pvs.maximum_power_transfer(10));
 
+  // exceptions
+  REQUIRE_THROWS_AS(PracticalVsCircuit(10, -50, 150), std::invalid_argument);
+  REQUIRE_THROWS_AS(PracticalVsCircuit(10, 50, -150), std::invalid_argument);
+  REQUIRE_THROWS_AS(pvs.set_load(-1), std::invalid_argument);
+  REQUIRE_THROWS_AS(pvs.maximum_power_transfer(-1), std::invalid_argument);
+}
 
+TEST_CASE("Network: Test PracticalVsCircuit dynamic and static binding", "[network]")
+{
+  // VoltageDivider pointer to a PracticalVsCircuit
+  VoltageDivider *vd_ptr = new PracticalVsCircuit(10, 50, 150);
+  // dynamic binding: the PracticalVsCircuit version runs (terminal voltage)
+  REQUIRE(compare_double((*vd_ptr).get_source_voltage(), 7.5));
+  // qualified call is bound at compile time: the VoltageDivider version runs (ideal voltage)
+  REQUIRE(compare_double((*vd_ptr).VoltageDivider::get_source_voltage(), 10));
 
+  // Network pointer to a PracticalVsCircuit
+  Network *net_ptr = new PracticalVsCircuit(10, 50, 150);
+  REQUIRE(compare_double((*net_ptr).get_node_voltage(0), 0));
+  REQUIRE(compare_double((*net_ptr).get_node_voltage(1), 10));
+  REQUIRE(compare_double((*net_ptr).get_node_voltage(2), 7.5));
 
+  // safe because ~Network is virtual
+  delete vd_ptr;
+  delete net_ptr;
+}
 
+TEST_CASE("Network: Test Resistor through reference and pointer", "[network]")
+{
+  Resistor r;
+  Component &c_ref = r;
+  Component *c_ptr = &r;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  // set_value is virtual, so the Resistor version runs through both
+  REQUIRE_THROWS_AS(c_ref.set_value(-1), std::invalid_argument);
+  REQUIRE_THROWS_AS((*c_ptr).set_value(-1), std::invalid_argument);
+  REQUIRE_NOTHROW(c_ref.set_value(100));
+  REQUIRE(compare_double((*c_ptr).get_value(), 100));
+}
