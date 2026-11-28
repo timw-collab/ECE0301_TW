@@ -9,7 +9,7 @@ private:
   // TODO: little to no here, only add private ones when necessary
 public:
   PracticalVsCircuit(double vs, double rs, double rl);
-  virtual double get_source_voltage() const override;
+  virtual double get_source_voltage() const override final;
   void set_load(double rl);
   double get_load_power() const;
   bool maximum_power_transfer(double rl);
