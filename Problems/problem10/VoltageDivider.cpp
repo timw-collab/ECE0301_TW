@@ -22,7 +22,7 @@ VoltageDivider::VoltageDivider(double v, double res[], int num_res) : Network(nu
     set_component(i + 1, r);
     connect_component_terminal_b(i + 1, i + 1);
     // Base case: last resistor returns to ground
-    if ((num_res - 1 )== 0)
+    if (i == num_res - 1)
     {
       connect_component_terminal_a(i + 1, 0);
     }
