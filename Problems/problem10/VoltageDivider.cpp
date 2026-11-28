@@ -69,7 +69,7 @@ double VoltageDivider::get_resistance(int idx) const
   return get_component_value(idx + 1);
 }
 
-\
+
 double VoltageDivider::get_resistor_voltage(int idx) const
 {
   // Base case: resistor index out of range
